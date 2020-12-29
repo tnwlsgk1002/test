@@ -48,7 +48,7 @@ class MyWidget(QWidget):
 
         self.pencolor = QColor(0, 0, 0)
         self.penbtn = QPushButton()
-        self.penbtn.setStyleSheet('backgroud-color : rgb(0,0,0)')
+        self.penbtn.setStyleSheet('background-color : rgb(0,0,0)')
         self.penbtn.clicked.connect(self.showColorDlg)
         grid.addWidget(self.penbtn, 1, 1)
 
@@ -63,7 +63,7 @@ class MyWidget(QWidget):
 
         self.brushcolor = QColor(255, 255, 255)
         self.brushbtn = QPushButton()
-        self.brushbtn.setStyleSheet('backgroud-color : rgb(255, 255, 255)')
+        self.brushbtn.setStyleSheet('background-color: rgb(255,255,255)')
         self.brushbtn.clicked.connect(self.showColorDlg)
         hbox.addWidget(self.brushbtn)
 
@@ -78,7 +78,7 @@ class MyWidget(QWidget):
 
         self.backcolor = QColor(255, 255, 255)
         self.backbtn = QPushButton()
-        self.backbtn.setStyleSheet('backgroud-color : rgb(255, 255, 255)')
+        self.backbtn.setStyleSheet('background-color : rgb(255,255,255)')
         self.backbtn.clicked.connect(self.showColorDlg)
         hbox.addWidget(self.backbtn)
 
@@ -95,11 +95,10 @@ class MyWidget(QWidget):
         left.addStretch(1)
 
         self.canvas = Canvas(self)
-        self.canvas.setGeometry(300, 0, self.width() - 300, self.height())
+        self.canvas.setGeometry(0, 0, 980, 720)
         self.canvas.createPixmap()
         # self.canvas.show()
 
-        self.canvas.mousePressEvent = self.canvas_mousePressEvent
         right.addWidget(self.canvas)
 
         formbox.addLayout(left)
@@ -120,19 +119,25 @@ class MyWidget(QWidget):
         pass
 
     def showColorDlg(self):
-
         color = QColorDialog.getColor()
         sender = self.sender()
 
         if sender == self.penbtn and color.isValid():
             self.pencolor = color
-            self.penbtn.setStyleSheet('backgroud-color: {}'.format(color.name()))
+            self.penbtn.setStyleSheet('background-color: {}'.format(color.name()))
+
         elif sender == self.brushbtn and color.isValid():
             self.brushcolor = color
-            self.brushbtn.setStyleSheet('backgroud-color: {}'.format(color.name()))
+            self.brushbtn.setStyleSheet('background-color: {}'.format(color.name()))
+
         else:
             self.backcolor = color
-            self.backbtn.setStyleSheet('backgroud-color: {}'.format(color.name()))
+            self.backbtn.setStyleSheet('background-color: {}'.format(color.name()))
+            #self.canvas.setStyleSheet('background-color: {}'.format(color.name()))
+            #pixmap = QPixmap(self.width(), self.height())
+            #pixmap.fill(color.name())
+            #self.canvas.setPixmap(pixmap)
+
 
     def value_changed(self):
         pass
