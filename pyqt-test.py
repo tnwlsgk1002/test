@@ -3,6 +3,36 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
+class MyApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle('Paint')
+        self.setFixedSize(1280, 720)
+
+        wg = MyWidget()
+        self.setCentralWidget(wg)
+
+        openAction = QAction('Open', self)
+        openAction.setShortcut('Ctrl+O')
+        openAction.setStatusTip('그림을 불러옵니다.')
+        openAction.triggered.connect(wg.canvas.open)
+
+        saveAction = QAction('Save', self)
+        saveAction.setShortcut('Ctrl+S')
+        saveAction.setStatusTip('그림을 저장합니다.')
+        saveAction.triggered.connect(wg.canvas.save)
+
+        self.statusBar()
+
+        menubar = self.menuBar()
+        menubar.setNativeMenuBar(False)
+        filemenu = menubar.addMenu('&File')
+        filemenu.addAction(openAction)
+        filemenu.addAction(saveAction)
+        
 class MyWidget(QWidget):
     def __init__(self):
         super().__init__()
@@ -18,7 +48,7 @@ class MyWidget(QWidget):
         box = QVBoxLayout()
         gb.setLayout(box)
 
-        text = ['펜', '선', '세모', '사각형', '원']
+        text = ['펜', '직선', '삼각형', '사각형', '타원']
         self.radiobtns = []
 
         for i in range(len(text)):
@@ -41,7 +71,7 @@ class MyWidget(QWidget):
         self.spinbox = QSpinBox()
         self.spinbox.setRange(1, 30)
         self.spinbox.valueChanged.connect(self.value_changed)
-        self.Thickness = 1
+        self.brushsize = 1
         grid.addWidget(self.spinbox, 0, 1)
 
         label = QLabel('선 색상')
@@ -56,17 +86,25 @@ class MyWidget(QWidget):
         gb = QGroupBox('채우기 설정')
         left.addWidget(gb)
 
-        hbox = QHBoxLayout()
-        gb.setLayout(hbox)
+        grid = QGridLayout()
+        gb.setLayout(grid)
 
-        label = QLabel('채우기 색상')
-        hbox.addWidget(label)
+        label = QLabel('채우기')
+        grid.addWidget(label, 0, 0)
 
+        self.combo = QComboBox(self)
+        grid.addWidget(self.combo, 0, 1)
+
+        self.combo.addItem('없음')
+        self.combo.addItem('단색')
+
+        label = QLabel('색상')
+        grid.addWidget(label, 1, 0)
         self.brushcolor = QColor(255, 255, 255)
         self.brushbtn = QPushButton()
         self.brushbtn.setStyleSheet('background-color: rgb(255,255,255)')
         self.brushbtn.clicked.connect(self.showColorDlg)
-        hbox.addWidget(self.brushbtn)
+        grid.addWidget(self.brushbtn, 1, 1)
 
         gb = QGroupBox('배경 설정')
         left.addWidget(gb)
@@ -96,7 +134,7 @@ class MyWidget(QWidget):
         left.addStretch(1)
 
         self.canvas = Canvas(self)
-        self.canvas.setGeometry(300, 0, 980, 720)
+        self.canvas.setGeometry(180, 0, 1094, 646)
         self.canvas.createPixmap()
         # self.canvas.show()
 
@@ -131,7 +169,7 @@ class MyWidget(QWidget):
             self.brushcolor = color
             self.brushbtn.setStyleSheet('background-color: {}'.format(color.name()))
 
-        else:
+        elif sender == self.backbtn and color.isValid():
             self.backcolor = color
             self.backbtn.setStyleSheet('background-color: {}'.format(color.name()))
             self.canvas.setStyleSheet('background-color: {}'.format(color.name()))
@@ -139,40 +177,8 @@ class MyWidget(QWidget):
             pixmap.fill(color)
             self.canvas.setPixmap(pixmap)
 
-
     def value_changed(self):
-        self.Thickness = self.spinbox.value()
-
-class MyApp(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.initUI()
-
-    def initUI(self):
-        self.setWindowTitle('Paint')
-        self.setFixedSize(1280, 720)
-
-        wg = MyWidget()
-        self.setCentralWidget(wg)
-
-        openAction = QAction('Open', self)
-        openAction.setShortcut('Ctrl+O')
-        openAction.setStatusTip('그림을 불러옵니다.')
-        # openAction.triggered.connect(wg.canvas.save())
-
-        saveAction = QAction('Save', self)
-        saveAction.setShortcut('Ctrl+S')
-        saveAction.setStatusTip('그림을 저장합니다.')
-        #saveAction.triggered.connect(wg.canvas.save())
-
-        self.statusBar()
-
-        menubar = self.menuBar()
-        menubar.setNativeMenuBar(False)
-        filemenu = menubar.addMenu('&File')
-        filemenu.addAction(openAction)
-        filemenu.addAction(saveAction)
-
+        self.brushsize = self.spinbox.value()
 
 class Canvas(QLabel):
     def __init__(self, parent):
@@ -195,6 +201,8 @@ class Canvas(QLabel):
 
     def mousePressEvent(self, e):
         if e.button() == Qt.LeftButton:
+            self.PrevX = e.x()
+            self.PrevY = e.y()
             self.drawing = True
 
     def mouseMoveEvent(self, e):
@@ -202,11 +210,10 @@ class Canvas(QLabel):
             self.draw_user(e.x(), e.y())
 
     def mouseReleaseEvent(self, e):
+        self.drawing = False
         self.draw_user(e.x(), e.y())
         self.PrevX = None
         self.PrevY = None
-        #if e.button() == Qt.LeftButton:
-        #    self.drawing = False
 
     def draw_user(self, x, y):
         if self.PrevX is None:
@@ -215,30 +222,52 @@ class Canvas(QLabel):
         else:
             self.NextX = x
             self.NextY = y
-            painter = QPainter(self.parent().canvas.pixmap())
-            painter.setPen(QPen(self.parent().pencolor, self.parent().Thickness))
-            painter.setBrush(QBrush(self.parent().brushcolor))
+
+            painter = QPainter(self.pixmap())
+            painter.setPen(QPen(self.parent().pencolor, self.parent().brushsize))
+            if self.parent().combo.currentIndex() == 1:
+                painter.setBrush(QBrush(self.parent().brushcolor))
+
+            if self.parent().checkbox.isChecked():
+                painter.setPen(QPen(self.parent().backcolor, self.parent().brushsize, Qt.SolidLine, Qt.RoundCap))
+                painter.drawLine(self.PrevX, self.PrevY, self.NextX, self.NextY)
+                self.PrevX = self.NextX
+                self.PrevY = self.NextY
 
             if self.parent().drawType == 0:
-                pass
-            elif self.parent().drawType == 1:
+                painter.setPen(QPen(self.parent().pencolor, self.parent().brushsize, Qt.SolidLine, Qt.RoundCap))
                 painter.drawLine(self.PrevX, self.PrevY, self.NextX, self.NextY)
-            elif self.parent().drawType == 2:
-                # polygon = QPolygon()
-                # painter.drawLine(self.PrevX, self.PrevY, self.NextX, self.NextY)
-                pass
-            elif self.parent().drawType == 3:
-                painter.drawRect(self.PrevX, self.PrevY, self.NextX, self.NextY)
-            elif self.parent().drawType == 4:
-                painter.drawEllipse(self.PrevX, self.PrevY, self.NextX, self.NextY)
+                self.PrevX = self.NextX
+                self.PrevY = self.NextY
+
+            elif self.drawing == False:
+                if self.parent().drawType == 1:
+                    painter.drawLine(self.PrevX, self.PrevY, self.NextX, self.NextY)
+                elif self.parent().drawType == 2:
+                    point = [QPoint(self.PrevX, self.NextY-self.PrevY),
+                             QPoint(self.NextX-self.PrevX, self.PrevX),
+                             QPoint(self.PrevX, self.PrevY)]
+                    polygon = QPolygon(point)
+                    painter.drawConvexPolygon(polygon)
+                elif self.parent().drawType == 3:
+                    painter.drawRect(self.PrevX, self.PrevY, self.NextX-self.PrevX, self.NextY-self.PrevY)
+                elif self.parent().drawType == 4:
+                    painter.drawEllipse(self.PrevX, self.PrevY, self.NextX-self.PrevX, self.NextY-self.PrevY)
 
             painter.end()
             self.update()
 
     def save(self):
-        fpath, _ = QFileDialog.getSaveFileName(self, 'Save Image', '', "PNG(*.png);;JPEG(*.jpg *.jpeg);;All Files(*.*) ")
-        if fpath:
-            self.image.save(fpath)
+        img = QPixmap(self.pixmap())
+        fname, _ = QFileDialog.getSaveFileName(self, 'Save Image', '', "PNG(*.png);;JPEG(*.jpg *.jpeg);;All Files(*.*) ")
+        if fname:
+            img.save(fname)
+
+    def open(self):
+        fname = QFileDialog.getOpenFileName(self, 'Open Image', './')
+        pixmap = QPixmap(fname[0])
+        self.setPixmap(QPixmap(pixmap))
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
