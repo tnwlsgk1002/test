@@ -41,6 +41,7 @@ class MyWidget(QWidget):
         self.spinbox = QSpinBox()
         self.spinbox.setRange(1, 30)
         self.spinbox.valueChanged.connect(self.value_changed)
+        self.Thickness = 1
         grid.addWidget(self.spinbox, 0, 1)
 
         label = QLabel('선 색상')
@@ -95,7 +96,7 @@ class MyWidget(QWidget):
         left.addStretch(1)
 
         self.canvas = Canvas(self)
-        self.canvas.setGeometry(0, 0, 980, 720)
+        self.canvas.setGeometry(300, 0, 980, 720)
         self.canvas.createPixmap()
         # self.canvas.show()
 
@@ -133,19 +134,14 @@ class MyWidget(QWidget):
         else:
             self.backcolor = color
             self.backbtn.setStyleSheet('background-color: {}'.format(color.name()))
-            #self.canvas.setStyleSheet('background-color: {}'.format(color.name()))
-            #pixmap = QPixmap(self.width(), self.height())
-            #pixmap.fill(color.name())
-            #self.canvas.setPixmap(pixmap)
+            self.canvas.setStyleSheet('background-color: {}'.format(color.name()))
+            pixmap = QPixmap(self.width(), self.height())
+            pixmap.fill(color)
+            self.canvas.setPixmap(pixmap)
 
 
     def value_changed(self):
-        pass
-
-    # self.spinbox.value()
-
-    def canvas_mousePressEvent(self, e):
-        pass
+        self.Thickness = self.spinbox.value()
 
 class MyApp(QMainWindow):
     def __init__(self):
@@ -156,15 +152,18 @@ class MyApp(QMainWindow):
         self.setWindowTitle('Paint')
         self.setFixedSize(1280, 720)
 
+        wg = MyWidget()
+        self.setCentralWidget(wg)
+
         openAction = QAction('Open', self)
         openAction.setShortcut('Ctrl+O')
         openAction.setStatusTip('그림을 불러옵니다.')
-        # openAction.triggered.connect(self.file_open)
+        # openAction.triggered.connect(wg.canvas.save())
 
         saveAction = QAction('Save', self)
         saveAction.setShortcut('Ctrl+S')
         saveAction.setStatusTip('그림을 저장합니다.')
-        # saveAction.triggered.connect(self.file_save)
+        #saveAction.triggered.connect(wg.canvas.save())
 
         self.statusBar()
 
@@ -174,15 +173,17 @@ class MyApp(QMainWindow):
         filemenu.addAction(openAction)
         filemenu.addAction(saveAction)
 
-        wg = MyWidget()
-        self.setCentralWidget(wg)
-
 
 class Canvas(QLabel):
     def __init__(self, parent):
         super().__init__()
         self.setParent(parent)
+        self.drawing = False
         self.setupUi()
+        self.PrevX = None
+        self.PrevY = None
+        self.NextX = None
+        self.NextY = None
 
     def setupUi(self):
         self.setStyleSheet('background-color: white;')
@@ -192,6 +193,52 @@ class Canvas(QLabel):
         pixmap.fill(Qt.white)
         self.setPixmap(pixmap)
 
+    def mousePressEvent(self, e):
+        if e.button() == Qt.LeftButton:
+            self.drawing = True
+
+    def mouseMoveEvent(self, e):
+        if (e.buttons() & Qt.LeftButton) & self.drawing:
+            self.draw_user(e.x(), e.y())
+
+    def mouseReleaseEvent(self, e):
+        self.draw_user(e.x(), e.y())
+        self.PrevX = None
+        self.PrevY = None
+        #if e.button() == Qt.LeftButton:
+        #    self.drawing = False
+
+    def draw_user(self, x, y):
+        if self.PrevX is None:
+            self.PrevX = x
+            self.PrevY = y
+        else:
+            self.NextX = x
+            self.NextY = y
+            painter = QPainter(self.parent().canvas.pixmap())
+            painter.setPen(QPen(self.parent().pencolor, self.parent().Thickness))
+            painter.setBrush(QBrush(self.parent().brushcolor))
+
+            if self.parent().drawType == 0:
+                pass
+            elif self.parent().drawType == 1:
+                painter.drawLine(self.PrevX, self.PrevY, self.NextX, self.NextY)
+            elif self.parent().drawType == 2:
+                # polygon = QPolygon()
+                # painter.drawLine(self.PrevX, self.PrevY, self.NextX, self.NextY)
+                pass
+            elif self.parent().drawType == 3:
+                painter.drawRect(self.PrevX, self.PrevY, self.NextX, self.NextY)
+            elif self.parent().drawType == 4:
+                painter.drawEllipse(self.PrevX, self.PrevY, self.NextX, self.NextY)
+
+            painter.end()
+            self.update()
+
+    def save(self):
+        fpath, _ = QFileDialog.getSaveFileName(self, 'Save Image', '', "PNG(*.png);;JPEG(*.jpg *.jpeg);;All Files(*.*) ")
+        if fpath:
+            self.image.save(fpath)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
