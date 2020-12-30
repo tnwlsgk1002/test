@@ -139,7 +139,6 @@ class MyWidget(QWidget):
             pixmap.fill(color)
             self.canvas.setPixmap(pixmap)
 
-
     def value_changed(self):
         self.brushsize = self.spinbox.value()
 
@@ -158,12 +157,12 @@ class MyApp(QMainWindow):
         openAction = QAction('Open', self)
         openAction.setShortcut('Ctrl+O')
         openAction.setStatusTip('그림을 불러옵니다.')
-        # openAction.triggered.connect(wg.canvas.save())
+        openAction.triggered.connect(wg.canvas.open)
 
         saveAction = QAction('Save', self)
         saveAction.setShortcut('Ctrl+S')
         saveAction.setStatusTip('그림을 저장합니다.')
-        #saveAction.triggered.connect(wg.canvas.save())
+        saveAction.triggered.connect(wg.canvas.save)
 
         self.statusBar()
 
@@ -172,6 +171,8 @@ class MyApp(QMainWindow):
         filemenu = menubar.addMenu('&File')
         filemenu.addAction(openAction)
         filemenu.addAction(saveAction)
+
+
 
 
 class Canvas(QLabel):
@@ -190,7 +191,6 @@ class Canvas(QLabel):
 
     def createPixmap(self):
         pixmap = QPixmap(self.width(), self.height())
-        print(self.width(), self.height())
         pixmap.fill(Qt.white)
         self.setPixmap(pixmap)
 
@@ -204,7 +204,6 @@ class Canvas(QLabel):
     def mouseMoveEvent(self, e): # 드래그(클릭과 이동을 동시에)
         if (e.buttons() & Qt.LeftButton) & self.drawing:
             self.draw_user(e.x(), e.y())
-
 
     def mouseReleaseEvent(self, e): # 뗐을 때
         self.drawing = False
@@ -254,10 +253,15 @@ class Canvas(QLabel):
             self.update()
 
     def save(self):
-        fpath, _ = QFileDialog.getSaveFileName(self, 'Save Image', '', "PNG(*.png);;JPEG(*.jpg *.jpeg);;All Files(*.*) ")
-        if fpath:
-            self.image.save(fpath)
+        img = QPixmap(self.pixmap())
+        fname, _ = QFileDialog.getSaveFileName(self, 'Save Image', '', "PNG(*.png);;JPEG(*.jpg *.jpeg);;All Files(*.*) ")
+        if fname:
+            img.save(fname)
 
+    def open(self):
+        fname = QFileDialog.getOpenFileName(self, 'Open Image', './')
+        pixmap = QPixmap(fname[0])
+        self.setPixmap(QPixmap(pixmap))
 
 
 if __name__ == '__main__':
