@@ -22,7 +22,7 @@ class MyApp(QWidget):
         self.label = Label(self)
 
         # SetCursor 설정
-        Cursor = QCursor(QPixmap('cross.png'))
+        Cursor = QCursor(Qt.CrossCursor)
         self.label.setCursor(Cursor)
 
         # 라디오버튼
@@ -88,8 +88,10 @@ class MyApp(QWidget):
                 return
             self.total = len(self.label_list)
             self.file = self.folder + "/" + self.label_list[0]
-            self.n1 = 0
+            self.n1 = 0 # 현재 label이 label_list에서 무엇을 가리키는 지 알리는 index
             self.label.initPixmap()
+            self.label.text_upload()
+            self.label.createPixmap()
 
         except FileNotFoundError:
             return
@@ -115,6 +117,8 @@ class MyApp(QWidget):
             if self.n1 == len(self.label_list) :
                 self.n1 = 0
         self.file = self.folder + "/" + self.label_list[self.n1]
+        self.label.initPixmap()
+        self.label.text_upload()
         self.label.createPixmap()
 
 
@@ -127,40 +131,41 @@ class Label(QLabel):
         self.exist = False
         self.ix = None
         self.iy = None
-        self.ori_image = []
-        self.text = []
 
     def initPixmap(self):
         self.image = cv2.imread(self.parent().file, cv2.IMREAD_COLOR)
         image = copy.deepcopy(self.image)
-        self.ori_image.append(image)
         self.h, self.w = self.image.shape[:2]
         qimage = QImage(self.image.data, self.w, self.h, self.image.strides[0], QImage.Format_BGR888)
         self.setPixmap(QPixmap.fromImage(qimage))
         self.exist = True
-        self.text.append([0])
         self.parent().resize(self.w + 50, self.h + 50)
         self.resize(self.w, self.h)
+        self.text = [] # label 정보가 담긴 2차원 리스트
 
-    # 텍스트를 기반으로 setPixmap (이동, 삭제 시)
+    # 파일 -> 텍스트
+    def text_upload(self):
+        try :
+            fname = self.parent().file.split('.')
+            with open(fname[0] + ".txt", 'r') as file :
+                line = None
+                while line != '':
+                    line = file.readline()
+                    line = line.strip('\n')
+                    text = line.split(', ')
+                    if text == [''] :
+                        break
+                    xy = list(map(int, text[0:4]))
+                    label = [text[4]]
+                    self.text.append(xy+label)
+        except FileNotFoundError: # 파일이 없는 경우
+            return
+
+    # text를 기반으로 pixmap 그리기
     def createPixmap(self):
-        # 처음 이미지를 열었을 경우
-        if len(self.text) < self.parent().n1+1 :
-            self.initPixmap()
-            return
-
-        # 이미지에 바운딩박스가 없는 경우
-        if self.text[self.parent().n1] == [0]:
-            self.image = copy.deepcopy(self.ori_image[self.parent().n1])
-            self.h, self.w = self.image.shape[:2]
-            qimage = QImage(self.image.data, self.w, self.h, self.image.strides[0], QImage.Format_BGR888)
-            self.parent().resize(self.w + 50, self.h + 50)
-            self.resize(self.w, self.h)
-            self.update()
-            return
-
-        self.image = copy.deepcopy(self.ori_image[self.parent().n1])
-        for i in self.text[self.parent().n1] :
+        for i in self.text:
+            if not i:
+                pass
             if i[4] == 'Dog':
                 self.image = cv2.rectangle(self.image, (i[0], i[1]), (i[2], i[3]), (0, 0, 255))
                 self.image = cv2.putText(self.image, 'Dog', ((i[0] + i[2]) // 2, i[1] - 10),
@@ -169,12 +174,11 @@ class Label(QLabel):
                 self.image = cv2.rectangle(self.image, (i[0], i[1]), (i[2], i[3]), (255, 0, 0))
                 self.image = cv2.putText(self.image, 'Cat', ((i[0] + i[2]) // 2, i[1] - 10),
                                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-        self.h, self.w = self.image.shape[:2]
         qimage = QImage(self.image.data, self.w, self.h, self.image.strides[0], QImage.Format_BGR888)
         self.setPixmap(QPixmap.fromImage(qimage))
         self.parent().resize(self.w + 50, self.h + 50)
         self.resize(self.w, self.h)
-        self.update()
+        self.repaint()
 
     def mousePressEvent(self, e):
         if not self.exist:
@@ -188,34 +192,32 @@ class Label(QLabel):
 
         # 삭제
         if e.button() == Qt.RightButton:
+            if not self.text :
+                return
+
             remove_index = self.box_exist(e.x(), e.y())
-            print('\nremove_index: ', remove_index)
             if remove_index == -1:
                 return
+            self.image = cv2.imread(self.parent().file, cv2.IMREAD_COLOR)
+            self.h, self.w = self.image.shape[:2]
 
             # text에서 바운딩 박스 삭제
-            # text를 바탕으로 qimage draw, self.image에 적용
-            if len(self.text[self.parent().n1]) == 1:
-                self.text[self.parent().n1].pop(remove_index)
-                self.createPixmap()
-                self.text[self.parent().n1].append(0)
-                return
-
-            self.text[self.parent().n1].pop(remove_index)
+            # text를 바탕으로 self.image에 적용
+            self.text.pop(remove_index)
             self.createPixmap()
 
             return
 
     # text 안에 바운딩 박스가 있는가 확인
     def box_exist(self, x, y):
-        for i in self.text[self.parent().n1]:
+        for i in self.text:
             if i == -1:
                 break
             if (i[0] <= x and i[1] <= y and i[2] >= x and i[3] >= y) or (
                 i[0] >= x and i[1] <= y and i[2] <= x and i[3] >= y) or (
                 i[0] >= x and i[1] >= y and i[2] <= x and i[3] <= y) or (
                 i[0] <= x and i[1] >= y and i[2] >= x and i[3] <= y) :
-                return self.text[self.parent().n1].index(i)
+                return self.text.index(i)
         return -1
 
     def mouseMoveEvent(self, e):
@@ -255,10 +257,7 @@ class Label(QLabel):
                                      cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
             list = [self.ix, self.iy, e.x(), e.y(), 'Cat']
 
-        self.text[self.parent().n1].append(list)
-        if self.text[self.parent().n1][0] == 0: # 첫 바운딩 박스인 경우
-            del self.text[self.parent().n1][0]
-
+        self.text.append(list)
         qimage = QImage(self.image.data, self.w, self.h, self.image.strides[0], QImage.Format_BGR888)
         self.setPixmap(QPixmap.fromImage(qimage))
 
@@ -266,16 +265,16 @@ class Label(QLabel):
     # 텍스트파일을 저장하여 업로드
     def text_save(self):
         fname = self.parent().file.split('.')
-        print(self.text)
         with open(fname[0] + ".txt", 'w') as file:
+            if not self.text :
+                return
             for i in self.text:
-                for j in i:
-                    if j == 0:
-                        return
-                    for k in j:
-                        file.write(str(k) + ' ')
-                    file.write('\n')
-
+                if not i:
+                    return
+                str_i = list(map(str, i))
+                text = ', '.join(str_i)
+                file.write(text)
+                file.write('\n')
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
