@@ -78,8 +78,12 @@ class MyApp(QWidget):
         self.show()
 
     def Directory(self):
-        self.folder = QFileDialog.getExistingDirectory(self, 'Open Folder', 'c:/')
         try:
+            self.folder = QFileDialog.getExistingDirectory(self, 'Open Folder', 'c:/')
+            print("self.folder : ", self.folder)
+            print(type(self.folder))
+            if not self.folder:
+                return
             self.dir.setText(self.folder)
             file_list = os.listdir(self.folder)
             self.label_list = [file for file in file_list if file.endswith(".png") or file.endswith(".jpg")]
@@ -134,7 +138,6 @@ class Label(QLabel):
 
     def initPixmap(self):
         self.image = cv2.imread(self.parent().file, cv2.IMREAD_COLOR)
-        image = copy.deepcopy(self.image)
         self.h, self.w = self.image.shape[:2]
         qimage = QImage(self.image.data, self.w, self.h, self.image.strides[0], QImage.Format_BGR888)
         self.setPixmap(QPixmap.fromImage(qimage))
@@ -146,7 +149,7 @@ class Label(QLabel):
     # 파일 -> 텍스트
     def text_upload(self):
         try :
-            fname = self.parent().file.split('.')
+            fname = self.parent().file.split('.jpg')
             with open(fname[0] + ".txt", 'r') as file :
                 line = None
                 while line != '':
@@ -264,7 +267,7 @@ class Label(QLabel):
 
     # 텍스트파일을 저장하여 업로드
     def text_save(self):
-        fname = self.parent().file.split('.')
+        fname = self.parent().file.split('.jpg')
         with open(fname[0] + ".txt", 'w') as file:
             if not self.text :
                 return
